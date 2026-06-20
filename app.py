@@ -11,7 +11,7 @@ from analysis.levels import calculate_levels
 from analysis.decision_engine import make_decision
 from storage.favorites import load_favorites, toggle
 
-st.set_page_config(page_title='Broker Pusu AI v3.6', page_icon='🦅', layout='wide')
+st.set_page_config(page_title='Broker Pusu AI v3.7', page_icon='🦅', layout='wide')
 apply_styles()
 
 
@@ -58,30 +58,33 @@ def metric_box(label, value, klass=''):
 
 def make_simple_opinion(decision, levels):
     if decision['color'] == 'green':
-        return f"Bu hisse şu an izlenebilir/alınabilir bölgede görünüyor. Çünkü fiyat destek bölgesine yakın, hedefe kadar alan var ve risk/kazanç oranı {decision['rr']:.2f}. Yine de zarar kes seviyesi olan {money(levels['stop'])} altında kalıcılık olursa işlem bozulmuş sayılır."
+        return f"Bu hisse şu an izlenebilir/alınabilir bölgede görünüyor. Hedefe kadar alan var. Zarar kes seviyesi olan {money(levels['stop'])} altında kalıcılık olursa işlem fikri bozulur."
     if decision['color'] == 'yellow':
-        return f"Bu hissede acele etmeye gerek yok. Fiyat kararsız bölgede. {money(levels['resistance'])} üzerine güçlenirse olumluya döner; {money(levels['stop'])} altına sarkarsa risk artar."
-    return f"Bu hisse şu an riskli bölgede görünüyor. Fiyat ya hedefe/dirence yakın ya da teknik göstergeler zayıf. Daha güvenli bölge için {money(levels['buy_low'])} - {money(levels['buy_high'])} aralığı beklenebilir."
+        return f"Bu hissede acele etmeye gerek yok. {money(levels['resistance'])} üzerine güçlenirse olumluya döner; {money(levels['stop'])} altına sarkarsa risk artar."
+    return f"Bu hisse şu an riskli bölgede görünüyor. Daha güvenli bölge için {money(levels['buy_low'])} - {money(levels['buy_high'])} aralığı beklenebilir."
 
 
 def make_chart_comment(levels):
     return f"""
     <div class="explain">
         <b>📌 Grafik yorumu:</b><br>
-        Fiyat <b>{money(levels['resistance'])}</b> üzerine atarsa hedef bölgesi güçlenir ve yukarı hareket devam edebilir.<br>
+        Fiyat <b>{money(levels['resistance'])}</b> üzerine atarsa yukarı hareket güçlenebilir.<br>
         Fiyat <b>{money(levels['buy_low'])} - {money(levels['buy_high'])}</b> aralığında tutunursa alıcılar güç kazanabilir.<br>
-        Fiyat <b>{money(levels['stop'])}</b> altına sarkarsa işlem fikri bozulur; zarar büyümeden çıkış düşünülür.
+        Fiyat <b>{money(levels['stop'])}</b> altına sarkarsa işlem fikri bozulur.
     </div>
     """
 
 
-def decision_card(decision, levels):
+def decision_card(decision, levels, symbol):
     klass = {'green': 'decision-green', 'yellow': 'decision-yellow', 'red': 'decision-red'}[decision['color']]
     icon = {'green': '🟢', 'yellow': '🟡', 'red': '🔴'}[decision['color']]
 
     st.markdown(
         f'''
         <div class="decision {klass}">
+            <div style="font-size:28px; font-weight:900; text-align:left; margin-bottom:8px;">
+                {symbol.upper()}
+            </div>
             <div class="decision-title">{icon} {decision['signal']}</div>
             <div class="decision-sub">{decision['subtitle']}</div>
             <div style="margin-top:18px">
@@ -106,10 +109,7 @@ def main():
 
     with st.sidebar:
         st.markdown('## 🦅 Broker Pusu AI')
-        st.markdown(
-            '<div class="tiny">Borsadan anlamayan kullanıcı için sade karar ekranı.</div>',
-            unsafe_allow_html=True
-        )
+        st.markdown('<div class="tiny">Borsadan anlamayan kullanıcı için sade karar ekranı.</div>', unsafe_allow_html=True)
         st.markdown('---')
 
         if st.button('🔄 Verileri yenile'):
@@ -121,10 +121,14 @@ def main():
         st.markdown('### ⭐ İzleme Listem')
 
         if favs:
-            for f in favs:
-                if st.button(f"📌 {f}", key=f"fav_{f}", use_container_width=True):
-                    st.session_state.selected_symbol = f.replace(".IS", "")
-                    st.rerun()
+            selected_fav = st.selectbox(
+                'Favorilerden hisse seç',
+                ['Seçiniz'] + [f.replace('.IS', '') for f in favs],
+                index=0
+            )
+            if selected_fav != 'Seçiniz':
+                st.session_state.selected_symbol = selected_fav
+                st.rerun()
         else:
             st.caption('Henüz favori yok.')
 
@@ -137,14 +141,12 @@ def main():
     st.markdown(
         '''
         <div class="hero">
-            <h1>🦅 Broker Pusu AI v3.6</h1>
+            <h1>🦅 Broker Pusu AI v3.7</h1>
             <div class="tiny">Hisseyi seç, uygulama sana sade Türkçe ile risk, destek, direnç, zarar kes ve karar özeti versin.</div>
         </div>
         ''',
         unsafe_allow_html=True
     )
-
-    st.write('')
 
     top1, top2, top3, top4 = st.columns(4)
     snap = cached_index_snapshot()
@@ -171,8 +173,6 @@ def main():
     with top4:
         metric_box('VİOP Son Kapanış', t, k)
 
-    st.write('')
-
     st.markdown('### ☀️ Sabah Günlük Trade Adayları')
     st.caption(f'Liste her gün 09:45 sonrası yeniden hesaplanır. Bugünkü liste anahtarı: {daily_key()}')
 
@@ -183,10 +183,8 @@ def main():
         st.warning('Günlük öneri üretilemedi. Ücretsiz veri kaynağı yanıt vermediğinde sahte öneri gösterilmez.')
     else:
         pc1, pc2, pc3 = st.columns(3)
-
         for i, pair in enumerate(zip([pc1, pc2, pc3], picks), start=1):
             col, item = pair
-
             with col:
                 st.markdown(
                     f"""
@@ -203,8 +201,6 @@ def main():
                     unsafe_allow_html=True
                 )
 
-    st.write('')
-
     c1, c2, c3 = st.columns([2, 1, 1])
 
     with c1:
@@ -217,10 +213,10 @@ def main():
     with c2:
         capital = st.number_input(
             'İşlem tutarı',
-            min_value=1000,
+            min_value=1,
             max_value=10_000_000,
             value=100_000,
-            step=1000
+            step=100
         )
 
     with c3:
@@ -243,9 +239,7 @@ def main():
 
     st.success('✅ ' + msg + ' Grafik: Son 1 ay / 1 saatlik mum verisi. Otomatik ekran yenileme kapalıdır.')
 
-    decision_card(decision, levels)
-
-    st.write('')
+    decision_card(decision, levels, symbol)
 
     m1, m2, m3, m4, m5 = st.columns(5)
 
