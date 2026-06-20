@@ -11,7 +11,7 @@ from analysis.levels import calculate_levels
 from analysis.decision_engine import make_decision
 from storage.favorites import load_favorites, toggle
 
-st.set_page_config(page_title='Broker Pusu AI v3.5', page_icon='🦅', layout='wide')
+st.set_page_config(page_title='Broker Pusu AI v3.6', page_icon='🦅', layout='wide')
 apply_styles()
 
 
@@ -31,7 +31,6 @@ def pct(x):
 
 @st.cache_data(ttl=900, show_spinner=False)
 def cached_history(symbol: str):
-    # v3.5: Grafik artık son 1 ay / 1 saatlik mum verisiyle çalışır.
     return get_history(symbol, period="1mo", interval="1h")
 
 
@@ -57,7 +56,26 @@ def metric_box(label, value, klass=''):
     )
 
 
-def decision_card(decision):
+def make_simple_opinion(decision, levels):
+    if decision['color'] == 'green':
+        return f"Bu hisse şu an izlenebilir/alınabilir bölgede görünüyor. Çünkü fiyat destek bölgesine yakın, hedefe kadar alan var ve risk/kazanç oranı {decision['rr']:.2f}. Yine de zarar kes seviyesi olan {money(levels['stop'])} altında kalıcılık olursa işlem bozulmuş sayılır."
+    if decision['color'] == 'yellow':
+        return f"Bu hissede acele etmeye gerek yok. Fiyat kararsız bölgede. {money(levels['resistance'])} üzerine güçlenirse olumluya döner; {money(levels['stop'])} altına sarkarsa risk artar."
+    return f"Bu hisse şu an riskli bölgede görünüyor. Fiyat ya hedefe/dirence yakın ya da teknik göstergeler zayıf. Daha güvenli bölge için {money(levels['buy_low'])} - {money(levels['buy_high'])} aralığı beklenebilir."
+
+
+def make_chart_comment(levels):
+    return f"""
+    <div class="explain">
+        <b>📌 Grafik yorumu:</b><br>
+        Fiyat <b>{money(levels['resistance'])}</b> üzerine atarsa hedef bölgesi güçlenir ve yukarı hareket devam edebilir.<br>
+        Fiyat <b>{money(levels['buy_low'])} - {money(levels['buy_high'])}</b> aralığında tutunursa alıcılar güç kazanabilir.<br>
+        Fiyat <b>{money(levels['stop'])}</b> altına sarkarsa işlem fikri bozulur; zarar büyümeden çıkış düşünülür.
+    </div>
+    """
+
+
+def decision_card(decision, levels):
     klass = {'green': 'decision-green', 'yellow': 'decision-yellow', 'red': 'decision-red'}[decision['color']]
     icon = {'green': '🟢', 'yellow': '🟡', 'red': '🔴'}[decision['color']]
 
@@ -72,6 +90,10 @@ def decision_card(decision):
                 <span class="pill">Orta Vade: {decision['mid']}</span>
                 <span class="pill">Uzun Vade: {decision['long']}</span>
             </div>
+            <div style="margin-top:20px; font-size:17px; line-height:1.6;">
+                <b>🧠 Fikrim:</b><br>
+                {make_simple_opinion(decision, levels)}
+            </div>
         </div>
         ''',
         unsafe_allow_html=True
@@ -79,6 +101,9 @@ def decision_card(decision):
 
 
 def main():
+    if "selected_symbol" not in st.session_state:
+        st.session_state.selected_symbol = "ASELS"
+
     with st.sidebar:
         st.markdown('## 🦅 Broker Pusu AI')
         st.markdown(
@@ -97,7 +122,9 @@ def main():
 
         if favs:
             for f in favs:
-                st.markdown(f'- {f}')
+                if st.button(f"📌 {f}", key=f"fav_{f}", use_container_width=True):
+                    st.session_state.selected_symbol = f.replace(".IS", "")
+                    st.rerun()
         else:
             st.caption('Henüz favori yok.')
 
@@ -110,7 +137,7 @@ def main():
     st.markdown(
         '''
         <div class="hero">
-            <h1>🦅 Broker Pusu AI v3.5</h1>
+            <h1>🦅 Broker Pusu AI v3.6</h1>
             <div class="tiny">Hisseyi seç, uygulama sana sade Türkçe ile risk, destek, direnç, zarar kes ve karar özeti versin.</div>
         </div>
         ''',
@@ -120,7 +147,6 @@ def main():
     st.write('')
 
     top1, top2, top3, top4 = st.columns(4)
-
     snap = cached_index_snapshot()
 
     with top1:
@@ -130,7 +156,6 @@ def main():
         item = snap.get(key, {})
         if not item.get('ok'):
             return 'Veri alınamadı', 'warn'
-
         klass = 'good' if item.get('change', 0) >= 0 else 'bad'
         return f"{item['value']:,.1f}  {pct(item['change'])}", klass
 
@@ -185,7 +210,7 @@ def main():
     with c1:
         symbol = st.text_input(
             'Hisse kodu',
-            value='ASELS',
+            key="selected_symbol",
             placeholder='Örn: ASELS, THYAO, TUPRS'
         ).upper().strip()
 
@@ -218,7 +243,7 @@ def main():
 
     st.success('✅ ' + msg + ' Grafik: Son 1 ay / 1 saatlik mum verisi. Otomatik ekran yenileme kapalıdır.')
 
-    decision_card(decision)
+    decision_card(decision, levels)
 
     st.write('')
 
@@ -269,6 +294,8 @@ def main():
             candle_chart(df, levels, f'{symbol.upper()} 1 Aylık / 1 Saatlik Karar Grafiği'),
             use_container_width=True
         )
+
+        st.markdown(make_chart_comment(levels), unsafe_allow_html=True)
 
         st.markdown(
             '''
