@@ -11,8 +11,32 @@ from analysis.levels import calculate_levels
 from analysis.decision_engine import make_decision
 from storage.favorites import load_favorites, toggle
 
-st.set_page_config(page_title='Broker Pusu AI v3.7', page_icon='🦅', layout='wide')
+st.set_page_config(page_title='Broker Pusu AI v3.8', page_icon='🦅', layout='wide')
 apply_styles()
+
+st.markdown("""
+<style>
+section[data-testid="stSidebar"] .stButton > button {
+    background: #ffffff !important;
+    color: #06111f !important;
+    border: 2px solid #39a7ff !important;
+    border-radius: 12px !important;
+    font-weight: 900 !important;
+    font-size: 16px !important;
+}
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: #39a7ff !important;
+    color: #ffffff !important;
+}
+.favorite-title {
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 900;
+    margin-top: 12px;
+    margin-bottom: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 
 def money(x):
@@ -45,15 +69,17 @@ def cached_trade_picks(key: str):
 
 
 def metric_box(label, value, klass=''):
-    st.markdown(
-        f'''
-        <div class="metricbox">
-            <div class="metric-label">{label}</div>
-            <div class="metric-value {klass}">{value}</div>
-        </div>
-        ''',
-        unsafe_allow_html=True
-    )
+    st.markdown(f'''
+    <div class="metricbox">
+        <div class="metric-label">{label}</div>
+        <div class="metric-value {klass}">{value}</div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+
+def set_symbol(sym):
+    st.session_state.selected_symbol = sym.replace(".IS", "").upper()
+    st.cache_data.clear()
 
 
 def make_simple_opinion(decision, levels):
@@ -79,28 +105,25 @@ def decision_card(decision, levels, symbol):
     klass = {'green': 'decision-green', 'yellow': 'decision-yellow', 'red': 'decision-red'}[decision['color']]
     icon = {'green': '🟢', 'yellow': '🟡', 'red': '🔴'}[decision['color']]
 
-    st.markdown(
-        f'''
-        <div class="decision {klass}">
-            <div style="font-size:28px; font-weight:900; text-align:left; margin-bottom:8px;">
-                {symbol.upper()}
-            </div>
-            <div class="decision-title">{icon} {decision['signal']}</div>
-            <div class="decision-sub">{decision['subtitle']}</div>
-            <div style="margin-top:18px">
-                <span class="pill">AI Güven Skoru: {decision['score']}/100</span>
-                <span class="pill">Trade: {decision['trade']}</span>
-                <span class="pill">Orta Vade: {decision['mid']}</span>
-                <span class="pill">Uzun Vade: {decision['long']}</span>
-            </div>
-            <div style="margin-top:20px; font-size:17px; line-height:1.6;">
-                <b>🧠 Fikrim:</b><br>
-                {make_simple_opinion(decision, levels)}
-            </div>
+    st.markdown(f'''
+    <div class="decision {klass}">
+        <div style="font-size:30px; font-weight:900; text-align:left; margin-bottom:8px;">
+            {symbol.upper()}
         </div>
-        ''',
-        unsafe_allow_html=True
-    )
+        <div class="decision-title">{icon} {decision['signal']}</div>
+        <div class="decision-sub">{decision['subtitle']}</div>
+        <div style="margin-top:18px">
+            <span class="pill">AI Güven Skoru: {decision['score']}/100</span>
+            <span class="pill">Trade: {decision['trade']}</span>
+            <span class="pill">Orta Vade: {decision['mid']}</span>
+            <span class="pill">Uzun Vade: {decision['long']}</span>
+        </div>
+        <div style="margin-top:20px; font-size:17px; line-height:1.6;">
+            <b>🧠 Fikrim:</b><br>
+            {make_simple_opinion(decision, levels)}
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
 
 def main():
@@ -112,41 +135,31 @@ def main():
         st.markdown('<div class="tiny">Borsadan anlamayan kullanıcı için sade karar ekranı.</div>', unsafe_allow_html=True)
         st.markdown('---')
 
-        if st.button('🔄 Verileri yenile'):
+        if st.button('🔄 VERİLERİ YENİLE', use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
         favs = load_favorites()
-
-        st.markdown('### ⭐ İzleme Listem')
+        st.markdown('<div class="favorite-title">⭐ İzleme Listem</div>', unsafe_allow_html=True)
 
         if favs:
-            selected_fav = st.selectbox(
-                'Favorilerden hisse seç',
-                ['Seçiniz'] + [f.replace('.IS', '') for f in favs],
-                index=0
-            )
-            if selected_fav != 'Seçiniz':
-                st.session_state.selected_symbol = selected_fav
-                st.rerun()
+            for f in favs:
+                clean = f.replace(".IS", "").upper()
+                if st.button(f"📌 {clean}", key=f"fav_btn_{clean}", use_container_width=True):
+                    set_symbol(clean)
+                    st.rerun()
         else:
             st.caption('Henüz favori yok.')
 
         st.markdown('---')
-        st.markdown(
-            '<div class="ytd">YTD: Bu uygulama yatırım tavsiyesi vermez. Eğitim ve karar destek amaçlıdır. Al/sat kararı ve risk kullanıcıya aittir.</div>',
-            unsafe_allow_html=True
-        )
+        st.markdown('<div class="ytd">YTD: Bu uygulama yatırım tavsiyesi vermez. Eğitim ve karar destek amaçlıdır. Al/sat kararı ve risk kullanıcıya aittir.</div>', unsafe_allow_html=True)
 
-    st.markdown(
-        '''
-        <div class="hero">
-            <h1>🦅 Broker Pusu AI v3.7</h1>
-            <div class="tiny">Hisseyi seç, uygulama sana sade Türkçe ile risk, destek, direnç, zarar kes ve karar özeti versin.</div>
-        </div>
-        ''',
-        unsafe_allow_html=True
-    )
+    st.markdown('''
+    <div class="hero">
+        <h1>🦅 Broker Pusu AI v3.8</h1>
+        <div class="tiny">Hisseyi seç, uygulama sana sade Türkçe ile risk, destek, direnç, zarar kes ve karar özeti versin.</div>
+    </div>
+    ''', unsafe_allow_html=True)
 
     top1, top2, top3, top4 = st.columns(4)
     snap = cached_index_snapshot()
@@ -186,20 +199,17 @@ def main():
         for i, pair in enumerate(zip([pc1, pc2, pc3], picks), start=1):
             col, item = pair
             with col:
-                st.markdown(
-                    f"""
-                    <div class="tradepick">
-                        <b>🔥 {i}. {item['symbol']}</b><br>
-                        <span>{item['reason']}</span>
-                        <hr>
-                        📌 <b>Pusu Seviyesi (Giriş):</b> {money(item['entry'])}<br>
-                        🦅 <b>Kâr Alma (Hedef):</b> {money(item['target'])}<br>
-                        🛡️ <b>Zarar Kes:</b> {money(item['stop'])}<br>
-                        <small>Güç skoru: {item['score']}/100</small>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                st.markdown(f"""
+                <div class="tradepick">
+                    <b>🔥 {i}. {item['symbol']}</b><br>
+                    <span>{item['reason']}</span>
+                    <hr>
+                    📌 <b>Pusu Seviyesi (Giriş):</b> {money(item['entry'])}<br>
+                    🦅 <b>Kâr Alma (Hedef):</b> {money(item['target'])}<br>
+                    🛡️ <b>Zarar Kes:</b> {money(item['stop'])}<br>
+                    <small>Güç skoru: {item['score']}/100</small>
+                </div>
+                """, unsafe_allow_html=True)
 
     c1, c2, c3 = st.columns([2, 1, 1])
 
@@ -245,16 +255,12 @@ def main():
 
     with m1:
         metric_box('Anlık fiyat', money(levels['last']), 'blue')
-
     with m2:
         metric_box('Alış bölgesi', f"{money(levels['buy_low'])}<br>{money(levels['buy_high'])}", 'good')
-
     with m3:
         metric_box('Zarar kes', money(levels['stop']), 'bad')
-
     with m4:
         metric_box('Hedef / direnç', money(levels['resistance']), 'good')
-
     with m5:
         metric_box('Risk / kazanç', f"1 / {decision['rr']:.2f}", 'warn' if decision['rr'] < 1.7 else 'good')
 
@@ -262,22 +268,16 @@ def main():
     possible_loss = max(0, (levels['last'] - levels['stop']) * qty)
     possible_gain = max(0, (levels['resistance'] - levels['last']) * qty)
 
-    st.markdown(
-        '<div class="card"><h3>💰 Yatırım olası sonuçları</h3><div class="tiny">Bu bölüm seçtiğin işlem tutarına göre yaklaşık kâr/zarar senaryosunu gösterir.</div></div>',
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="card"><h3>💰 Yatırım olası sonuçları</h3><div class="tiny">Bu bölüm seçtiğin işlem tutarına göre yaklaşık kâr/zarar senaryosunu gösterir.</div></div>', unsafe_allow_html=True)
 
     a, b, c, d = st.columns(4)
 
     with a:
         metric_box('Alınabilecek lot', f'{qty:,}'.replace(',', '.'), 'blue')
-
     with b:
         metric_box('Zarar kes çalışırsa yaklaşık zarar', money(possible_loss), 'bad')
-
     with c:
         metric_box('Hedef gelirse yaklaşık kâr', money(possible_gain), 'good')
-
     with d:
         metric_box('Sermayeye göre risk', f"%{decision['risk_pct']:.2f}".replace('.', ','), 'warn')
 
@@ -288,28 +288,12 @@ def main():
             candle_chart(df, levels, f'{symbol.upper()} 1 Aylık / 1 Saatlik Karar Grafiği'),
             use_container_width=True
         )
-
         st.markdown(make_chart_comment(levels), unsafe_allow_html=True)
-
-        st.markdown(
-            '''
-            <div class="explain">
-                <b>Grafik çizgileri ne demek?</b><br>
-                🔵 Anlık fiyat: Hissenin şu anki seviyesi.<br>
-                🟡 Destek: Fiyatın tutunma ihtimali olan bölge.<br>
-                🟢 Direnç/Hedef: Kâr alınabilecek üst bölge.<br>
-                🔴 Zarar kes: Batınca çıkmak değil; destek bozulursa zararı büyümeden sınırlama seviyesidir.
-            </div>
-            ''',
-            unsafe_allow_html=True
-        )
 
     with right:
         st.markdown('<div class="card"><h3>🧠 Neden böyle dedi?</h3></div>', unsafe_allow_html=True)
-
         for r in decision['good']:
             st.markdown(f'<div class="explain">✅ {r}</div>', unsafe_allow_html=True)
-
         for r in decision['bad']:
             st.markdown(f'<div class="explain">⚠️ {r}</div>', unsafe_allow_html=True)
 
@@ -319,34 +303,18 @@ def main():
     st.markdown('### 🏦 Kurumsal / fon / aracı kurum paneli')
 
     p1, p2, p3 = st.columns(3)
-
     with p1:
-        st.markdown(
-            '<div class="placeholder"><b>Son 3 aylık fon giriş-çıkış</b><br><br>Gerçek veri için Matriks / Foreks / MKK / Takasbank bağlantısı gerekir. Şimdilik sahte veri gösterilmez.</div>',
-            unsafe_allow_html=True
-        )
-
+        st.markdown('<div class="placeholder"><b>Son 3 aylık fon giriş-çıkış</b><br><br>Gerçek veri için Matriks / Foreks / MKK / Takasbank bağlantısı gerekir.</div>', unsafe_allow_html=True)
     with p2:
-        st.markdown(
-            '<div class="placeholder"><b>Kurumsal - bireysel dağılım</b><br><br>Veri kaynağı bağlanınca yüzde dağılımı burada pasta grafik olarak gösterilecek.</div>',
-            unsafe_allow_html=True
-        )
-
+        st.markdown('<div class="placeholder"><b>Kurumsal - bireysel dağılım</b><br><br>Veri kaynağı bağlanınca yüzde dağılımı burada gösterilecek.</div>', unsafe_allow_html=True)
     with p3:
-        st.markdown(
-            '<div class="placeholder"><b>En çok alan ilk 3 aracı kurum</b><br><br>AKD verisi bağlanınca kurum adı ve yüzde payı burada listelenecek.</div>',
-            unsafe_allow_html=True
-        )
+        st.markdown('<div class="placeholder"><b>En çok alan ilk 3 aracı kurum</b><br><br>AKD verisi bağlanınca kurum adı ve yüzde payı burada listelenecek.</div>', unsafe_allow_html=True)
 
     st.markdown('### 📰 Önemli piyasa haberleri')
-
     for n in get_news(6):
         st.markdown(f'- [{n["title"]}]({n["link"]})')
 
-    st.markdown(
-        '<br><div class="ytd">YTD: Buradaki AL / ALMA / BEKLE ifadeleri mekanik karar destek çıktısıdır; yatırım tavsiyesi değildir.</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown('<br><div class="ytd">YTD: Buradaki AL / ALMA / BEKLE ifadeleri mekanik karar destek çıktısıdır; yatırım tavsiyesi değildir.</div>', unsafe_allow_html=True)
 
 
 if __name__ == '__main__':
