@@ -43,3 +43,5 @@ def apply_styles():
     .tradepick small{color:#fbbf24; font-weight:700;}
     </style>
     ''', unsafe_allow_html=True)
+
+# v3.4 mobile tightening

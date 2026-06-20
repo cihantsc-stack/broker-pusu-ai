@@ -11,7 +11,7 @@ from analysis.levels import calculate_levels
 from analysis.decision_engine import make_decision
 from storage.favorites import load_favorites, toggle
 
-st.set_page_config(page_title='Broker Pusu AI v3.3', page_icon='🦅', layout='wide')
+st.set_page_config(page_title='Broker Pusu AI v3.4', page_icon='🦅', layout='wide')
 apply_styles()
 
 
@@ -33,6 +33,11 @@ def cached_history(symbol: str):
 @st.cache_data(ttl=900, show_spinner=False)
 def cached_index_snapshot():
     return get_index_snapshot()
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cached_trade_picks(key: str):
+    return get_daily_trade_picks(3)
 
 
 def metric_box(label, value, klass=''):
@@ -73,7 +78,7 @@ def main():
         st.markdown('---')
         st.markdown('<div class="ytd">YTD: Bu uygulama yatırım tavsiyesi vermez. Eğitim ve karar destek amaçlıdır. Al/sat kararı ve risk kullanıcıya aittir.</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="hero"><h1>🦅 Broker Pusu AI v3.3</h1><div class="tiny">Hisseyi seç, uygulama sana sade Türkçe ile risk, destek, direnç, stop ve karar özeti versin.</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero"><h1>🦅 Broker Pusu AI v3.4</h1><div class="tiny">Hisseyi seç, uygulama sana sade Türkçe ile risk, destek, direnç, stop ve karar özeti versin.</div></div>', unsafe_allow_html=True)
     st.write('')
 
     top1, top2, top3, top4 = st.columns(4)
@@ -96,7 +101,7 @@ def main():
     st.markdown('### ☀️ Sabah Günlük Trade Adayları')
     st.caption(f'Liste her gün 09:45 sonrası yeniden hesaplanır. Bugünkü liste anahtarı: {daily_key()}')
     with st.spinner('Günlük trade adayları hazırlanıyor...'):
-        picks = get_daily_trade_picks(3)
+        picks = cached_trade_picks(daily_key())
     if not picks:
         st.warning('Günlük öneri üretilemedi. Ücretsiz veri kaynağı yanıt vermediğinde sahte öneri gösterilmez.')
     else:
@@ -110,7 +115,7 @@ def main():
                     <span>{item['reason']}</span><hr>
                     📌 <b>Pusu Seviyesi (Giriş):</b> {money(item['entry'])}<br>
                     🦅 <b>Kâr Alma (Hedef):</b> {money(item['target'])}<br>
-                    🛡️ <b>Stop Loss (Zarar Kes):</b> {money(item['stop'])}<br>
+                    🛡️ <b>Zarar Kes (Stop):</b> {money(item['stop'])}<br>
                     <small>Güç skoru: {item['score']}/100</small>
                 </div>
                 """, unsafe_allow_html=True)
@@ -146,7 +151,7 @@ def main():
     m1,m2,m3,m4,m5 = st.columns(5)
     with m1: metric_box('Anlık fiyat', money(levels['last']), 'blue')
     with m2: metric_box('Alış bölgesi', f"{money(levels['buy_low'])}<br>{money(levels['buy_high'])}", 'good')
-    with m3: metric_box('Stop-loss', money(levels['stop']), 'bad')
+    with m3: metric_box('Zarar kes', money(levels['stop']), 'bad')
     with m4: metric_box('Hedef / direnç', money(levels['resistance']), 'good')
     with m5: metric_box('Risk / kazanç', f"1 / {decision['rr']:.2f}", 'warn' if decision['rr']<1.7 else 'good')
 
@@ -156,14 +161,14 @@ def main():
     st.markdown('<div class="card"><h3>💰 Yatırım olası sonuçları</h3></div>', unsafe_allow_html=True)
     a,b,c,d = st.columns(4)
     with a: metric_box('Alınabilecek lot', f'{qty:,}'.replace(',','.'), 'blue')
-    with b: metric_box('Stop çalışırsa olası zarar', money(possible_loss), 'bad')
+    with b: metric_box('Zarar kes çalışırsa olası zarar', money(possible_loss), 'bad')
     with c: metric_box('Hedef gelirse olası kâr', money(possible_gain), 'good')
     with d: metric_box('Sermayeye göre risk', f"%{decision['risk_pct']:.2f}".replace('.',','), 'warn')
 
     left, right = st.columns([1.35, .65])
     with left:
         st.plotly_chart(candle_chart(df, levels, f'{symbol.upper()} Karar Grafiği'), use_container_width=True)
-        st.markdown('<div class="explain"><b>Grafik çizgileri ne demek?</b><br>🔵 Anlık fiyat: Hissenin şu anki seviyesi.<br>🟡 Destek: Fiyatın tutunma ihtimali olan bölge.<br>🟢 Direnç/Hedef: Kâr alınabilecek üst bölge.<br>🔴 Stop-loss: Batınca çıkmak değil; destek bozulursa zararı büyümeden sınırlama seviyesidir.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="explain"><b>Grafik çizgileri ne demek?</b><br>🔵 Anlık fiyat: Hissenin şu anki seviyesi.<br>🟡 Destek: Fiyatın tutunma ihtimali olan bölge.<br>🟢 Direnç/Hedef: Kâr alınabilecek üst bölge.<br>🔴 Zarar kes: Batınca çıkmak değil; destek bozulursa zararı büyümeden sınırlama seviyesidir.</div>', unsafe_allow_html=True)
     with right:
         st.markdown('<div class="card"><h3>🧠 Neden böyle dedi?</h3></div>', unsafe_allow_html=True)
         for r in decision['good']:

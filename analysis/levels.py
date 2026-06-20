@@ -14,32 +14,36 @@ def _pivot_high(df, lookback=55):
 def calculate_levels(df):
     """Pratik işlem seviyeleri.
 
-    Stop-loss mantığı: batınca çık değil; son destek aşağı kırılırsa zararı sınırlama.
-    Bu yüzden stop, desteğin hemen altına konur ve anlık fiyattan aşırı uzaklaştırılmaz.
+    Mantık: stop-loss "batınca çık" seviyesi değildir. Destek bozulursa zararı
+    büyütmeden sınırlama alanıdır. Bu yüzden stop anlık fiyattan gereksiz uzak
+    bırakılmaz; ATR + yakın destek + maksimum risk sınırı birlikte kullanılır.
     """
     last = float(df['Close'].iloc[-1])
-    atr = float(df['ATR'].iloc[-1]) if 'ATR' in df and not np.isnan(df['ATR'].iloc[-1]) else last * 0.025
+    atr = float(df['ATR'].iloc[-1]) if 'ATR' in df and not np.isnan(df['ATR'].iloc[-1]) else last * 0.022
 
-    support_raw = _pivot_low(df, 35)
+    raw_support = _pivot_low(df, 35)
+    recent_support = float(df.tail(20)['Low'].min())
     resistance_raw = _pivot_high(df, 55)
 
-    # Destek çok uzaktaysa daha yakın pratik destek kullanılır.
-    support = support_raw
-    if (last - support) / last > 0.075:
-        support = float(df.tail(20)['Low'].min())
+    # Kullanılabilir destek: son büyük dip çok uzaktaysa daha yakın 20 günlük dip kullanılır.
+    support = raw_support
+    if (last - support) / last > 0.065:
+        support = recent_support
 
-    # Stop: desteğin az altı, ama anlık fiyattan aşırı uzak değil.
-    stop_by_support = support - atr * 0.25
-    stop_max_loss = last * 0.955  # yaklaşık en fazla %4,5 risk alanı
-    stop = max(stop_by_support, stop_max_loss)
-    stop = min(stop, last * 0.985)  # stop anlık fiyatın üstüne/yakınına taşmasın
+    # Stop üç güvenlik kuralına göre seçilir:
+    # 1) desteğin az altı, 2) ATR ile makul pay, 3) en fazla yaklaşık %3,5-4 risk.
+    stop_by_support = support - atr * 0.18
+    stop_by_atr = last - atr * 1.25
+    max_loss_stop = last * 0.965
+    stop = max(stop_by_support, stop_by_atr, max_loss_stop)
+    stop = min(stop, last * 0.992)  # stop anlık fiyata yapışmasın ama fiyatın üstüne çıkmasın
 
     resistance = resistance_raw
-    if resistance <= last * 1.01:
-        resistance = last + atr * 2.8
+    if resistance <= last * 1.012:
+        resistance = last + atr * 2.6
 
-    buy_low = max(support, last - atr * 0.6)
-    buy_high = min(last + atr * 0.25, resistance)
+    buy_low = max(support, last - atr * 0.45)
+    buy_high = min(last + atr * 0.18, resistance * 0.995)
 
     return {
         'last': last,
